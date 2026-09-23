@@ -1,0 +1,13 @@
+{
+  "name": "wa-pair-generator",
+  "version": "1.0.0",
+  "main": "pair.js",
+  "scripts": {
+    "start": "node pair.js"
+  },
+  "dependencies": {
+    "@whiskeysockets/baileys": "^6.7.12",
+    "pino": "^9.0.0"
+  }
+}
+
