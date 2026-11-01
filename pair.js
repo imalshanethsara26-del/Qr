@@ -6,18 +6,16 @@ const fs = require('fs');
 const path = require('path');
 
 const PHONE_NUMBER = "94740196225"; // ඔයාගේ WhatsApp අංකය මෙතැනට දෙන්න
+const sessionDir = './session';
+
+// ස්ක්‍රිප්ට් එක මුල් වතාවට පටන් ගන්නකොට විතරක් පරණ session ෆෝල්ඩර් එක ඩිලීට් කරයි
+if (fs.existsSync(sessionDir)) {
+    fs.rmSync(sessionDir, { recursive: true, force: true });
+    console.log("🧹 Cleaned old session files at startup.");
+}
+fs.mkdirSync(sessionDir, { recursive: true });
 
 async function generateSession() {
-    const sessionDir = './session';
-
-    // සෑම වතාවකම ස්ක්‍රිප්ට් එක පටන් ගන්නකොට පැරණි session ෆයිල්ස් තිබේ නම් ඩිලීට් කර දමයි
-    if (fs.existsSync(sessionDir)) {
-        fs.rmSync(sessionDir, { recursive: true, force: true });
-        console.log("🧹 Cleaned old session files.");
-    }
-    
-    fs.mkdirSync(sessionDir, { recursive: true });
-
     const { state, saveCreds } = await useMultiFileAuthState(sessionDir);
     
     const sock = makeWASocket({
@@ -65,7 +63,7 @@ async function generateSession() {
                         fileName: 'creds.json',
                         caption: '✅ *SARA MOVIE BOT - CREDENTIALS*\n\nමෙම `creds.json` ෆයිල් එක Download කරගෙන Main Bot Repo එකේ `session/` Folder එක ඇතුලට දාන්න.'
                     });
-                    console.log("🎉 creds.json sent to WhatsApp successfully! You can stop this script now.\n");
+                    console.log("🎉 creds.json sent to WhatsApp successfully!\n");
                 } catch (e) {
                     console.error("❌ Error sending file:", e.message);
                 }
@@ -77,10 +75,12 @@ async function generateSession() {
         if (connection === 'close') {
             const statusCode = lastDisconnect?.error?.output?.statusCode;
             console.log(`⚠️ Connection closed with status: ${statusCode}`);
-            if (statusCode !== DisconnectReason.loggedOut) {
-                generateSession();
-            } else {
+            
+            if (statusCode === DisconnectReason.loggedOut) {
                 console.log("❌ Device logged out.");
+            } else {
+                console.log("🔄 Reconnecting...");
+                setTimeout(() => generateSession(), 5000);
             }
         }
     });
