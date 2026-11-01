@@ -3,11 +3,22 @@ console.log("🚀 Starting Pairing Code Generator...");
 const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require('@whiskeysockets/baileys');
 const pino = require('pino');
 const fs = require('fs');
+const path = require('path');
 
-const PHONE_NUMBER = "94740196225"; // ඔයාගේ WhatsApp අංකය
+const PHONE_NUMBER = "94740196225"; // ඔයාගේ WhatsApp අංකය මෙතැනට දෙන්න
 
 async function generateSession() {
-    const { state, saveCreds } = await useMultiFileAuthState('./session');
+    const sessionDir = './session';
+
+    // සෑම වතාවකම ස්ක්‍රිප්ට් එක පටන් ගන්නකොට පැරණි session ෆයිල්ස් තිබේ නම් ඩිලීට් කර දමයි
+    if (fs.existsSync(sessionDir)) {
+        fs.rmSync(sessionDir, { recursive: true, force: true });
+        console.log("🧹 Cleaned old session files.");
+    }
+    
+    fs.mkdirSync(sessionDir, { recursive: true });
+
+    const { state, saveCreds } = await useMultiFileAuthState(sessionDir);
     
     const sock = makeWASocket({
         logger: pino({ level: 'silent' }),
@@ -29,7 +40,7 @@ async function generateSession() {
             } catch (err) {
                 console.error("❌ Error requesting code:", err.message);
             }
-        }, 3000);
+        }, 4000);
     }
 
     sock.ev.on('connection.update', async (update) => {
@@ -41,34 +52,38 @@ async function generateSession() {
 
             const userJid = `${PHONE_NUMBER.replace(/[^0-9]/g, '')}@s.whatsapp.net`;
             
-            // Wait 2 seconds to make sure creds.json is written to disk
-            await new Promise(r => setTimeout(r, 2000));
+            // සෙෂන් එක සම්පූර්ණයෙන්ම ස්ථාවර වීමට තත්පර 5ක් ඉඩ දෙන්න
+            await new Promise(r => setTimeout(r, 5000));
 
-            if (fs.existsSync('./session/creds.json')) {
+            const credsPath = path.join(sessionDir, 'creds.json');
+
+            if (fs.existsSync(credsPath)) {
                 try {
                     await sock.sendMessage(userJid, {
-                        document: fs.readFileSync('./session/creds.json'),
+                        document: fs.readFileSync(credsPath),
                         mimetype: 'application/json',
                         fileName: 'creds.json',
                         caption: '✅ *SARA MOVIE BOT - CREDENTIALS*\n\nමෙම `creds.json` ෆයිල් එක Download කරගෙන Main Bot Repo එකේ `session/` Folder එක ඇතුලට දාන්න.'
                     });
-                    console.log("🎉 creds.json sent to WhatsApp! You can stop this script now.\n");
+                    console.log("🎉 creds.json sent to WhatsApp successfully! You can stop this script now.\n");
                 } catch (e) {
                     console.error("❌ Error sending file:", e.message);
                 }
             } else {
-                console.log("❌ creds.json file not found in ./session folder!");
+                console.log("❌ creds.json file not found in session folder!");
             }
         }
 
         if (connection === 'close') {
             const statusCode = lastDisconnect?.error?.output?.statusCode;
+            console.log(`⚠️ Connection closed with status: ${statusCode}`);
             if (statusCode !== DisconnectReason.loggedOut) {
                 generateSession();
+            } else {
+                console.log("❌ Device logged out.");
             }
         }
     });
 }
 
 generateSession();
-
